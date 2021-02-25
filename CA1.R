@@ -4,8 +4,6 @@ library(oligo)
 # it can sometimes give errors, but the resulting elements of the list are easier to work with417
 gse1 <- getGEO('GSE153922') # just getting the main data post-rma
 #if you download using getGeo,rma(or something else)has already been done
-length(gse1)
-class(gse1[[1]])
 
 
 # pull out the ExpressionSet object(3'biased probe set) as the first member of the list 
@@ -21,9 +19,7 @@ description(gse1)
 ## or if there is an error in parsing.
 ## This creates a data structure that resembles the 
 ## underlying SOFT format.
-gse2 <- getGEO('GSE153922',GSEMatrix = FALSE)
 
-class(gse2) #list
 
 ## Let's look at gse1
 
@@ -31,29 +27,6 @@ methods(class=class(gse1))
 names(pData(gse1))
 
 # Let's look at gse2
-
-methods(class=class(gse2))
-
-## We only have three methods! 
-## GPLList() will extract a list of platforms
-## GSMList() will extract a list of samples
-## Meta() will extract metadata about the series
-
-length(GSMList(gse2)) ## six samples
-length(GPLList(gse2)) ## one platform
-
-## Get the first sample, which is a GSM object
-
-class(GSMList(gse2)[[1]])
-
-Meta(GSMList(gse2)[[1]])
-
-# How can I extract the right Meta data into a data frame for later analysis 
-
-names(Meta(GSMList(gse2)[[1]]))
-meta_data <- Meta(GSMList(gse2)[[1]])
-Meta(GSMList(gse2)[[1]])$characteristics_ch1
-Meta(GSMList(gse2)[[1]])$description
 
 ## back to gse1
 
