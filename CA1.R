@@ -10,22 +10,12 @@ gse1 <- getGEO('GSE153922') # just getting the main data post-rma
 gse1 <- gse1[[1]]
 
 
-
-## In some cases, we may want to get the data itself
-## in case we need addictional columns from the GSE records
-## or if there is an error in parsing.
-## This creates a data structure that resembles the 
-## underlying SOFT format.
+gse1<-gse1[[1]]
+pd <- pData(gse1)
+pd['cel_file'] <- str_split(pd$supplementary_file,"/") %>% map_chr(tail,1)
+gse153922_celdata <- read.celfiles(paste0('C:\\Users\\Admin\\Desktop\\GSE153922\\',pd$cel_file),phenoData=phenoData(gse1))
 
 
-## Let's look at gse1
-
-
-# Let's look at gse2
-
-## back to gse1
-
-names(pData(gse1))/#head()
 gse1@experimentData
 pData(gse1)[,c("culture medium:ch1","supplementary_file")]
 
