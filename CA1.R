@@ -1,16 +1,8 @@
 library(GEOquery)
 library(oligo)
-library(affy)
-gsm <- getGEO('GSM820817',GSEMatrix=FALSE)
-#Light source that's being measured in these hybridization chips sometimes they would measure two colors like red and green, but in this case they're just measuring one so there's only one channel.
-#Table() dataframe
-# reading a GSE object from GEO
-
-# This will create a list of ExpressionSet objects (if two platforms are used for the series,
-# the list will have two elements, etc).
 
 # it can sometimes give errors, but the resulting elements of the list are easier to work with417
-gse1 <- getGEO('GSE33146') # just getting the main data post-rma
+gse1 <- getGEO('GSE153922') # just getting the main data post-rma
 #if you download using getGeo,rma(or something else)has already been done
 length(gse1)
 class(gse1[[1]])
@@ -29,7 +21,7 @@ description(gse1)
 ## or if there is an error in parsing.
 ## This creates a data structure that resembles the 
 ## underlying SOFT format.
-gse2 <- getGEO('GSE33146',GSEMatrix = FALSE)
+gse2 <- getGEO('GSE153922',GSEMatrix = FALSE)
 
 class(gse2) #list
 
