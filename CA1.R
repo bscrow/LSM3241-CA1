@@ -1,1 +1,187 @@
-testing
+library(GEOquery)
+library(oligo)
+library(affy)
+gsm <- getGEO('GSM820817',GSEMatrix=FALSE)
+#Light source that's being measured in these hybridization chips sometimes they would measure two colors like red and green, but in this case they're just measuring one so there's only one channel.
+#Table() dataframe
+# reading a GSE object from GEO
+
+# This will create a list of ExpressionSet objects (if two platforms are used for the series,
+# the list will have two elements, etc).
+
+# it can sometimes give errors, but the resulting elements of the list are easier to work with417
+gse1 <- getGEO('GSE33146') # just getting the main data post-rma
+#if you download using getGeo,rma(or something else)has already been done
+length(gse1)
+class(gse1[[1]])
+
+
+# pull out the ExpressionSet object(3'biased probe set) as the first member of the list 
+gse1 <- gse1[[1]]
+
+# what can we do with this
+methods(class=class(gse1))
+notes(gse1)
+description(gse1)
+
+## In some cases, we may want to get the data itself
+## in case we need addictional columns from the GSE records
+## or if there is an error in parsing.
+## This creates a data structure that resembles the 
+## underlying SOFT format.
+gse2 <- getGEO('GSE33146',GSEMatrix = FALSE)
+
+class(gse2) #list
+
+## Let's look at gse1
+
+methods(class=class(gse1))
+names(pData(gse1))
+
+# Let's look at gse2
+
+methods(class=class(gse2))
+
+## We only have three methods! 
+## GPLList() will extract a list of platforms
+## GSMList() will extract a list of samples
+## Meta() will extract metadata about the series
+
+length(GSMList(gse2)) ## six samples
+length(GPLList(gse2)) ## one platform
+
+## Get the first sample, which is a GSM object
+
+class(GSMList(gse2)[[1]])
+
+Meta(GSMList(gse2)[[1]])
+
+# How can I extract the right Meta data into a data frame for later analysis 
+
+names(Meta(GSMList(gse2)[[1]]))
+meta_data <- Meta(GSMList(gse2)[[1]])
+Meta(GSMList(gse2)[[1]])$characteristics_ch1
+Meta(GSMList(gse2)[[1]])$description
+
+## back to gse1
+
+names(pData(gse1))/#head()
+gse1@experimentData
+pData(gse1)[,c("culture medium:ch1","supplementary_file")]
+
+### GET OUR RAW DATA
+
+raw_data <- read.affybatch(filenames=paste0('data/',list.celfiles('data')))
+#not given characteristics of the data
+paste0('data/',list.celfiles('data'))
+
+pData(raw_data)
+
+### Can we fix this warning? 
+#In read.affybatch(filenames = paste0("data/", list.celfiles("data"))) : Incompatible phenoData object. Created a new one.
+pd <- pData(gse1)
+pd$filename <- list.celfiles('data')
+dim(pd)
+dim(pData(gse1))
+
+raw_data <- read.affybatch(filenames=paste0('data/',list.celfiles('data')),
+                           phenoData=AnnotatedDataFrame(pd))
+raw_data$filename
+
+
+### running RMA
+rma(raw_data)
+
+# background correction
+plotDensity(log(exprs(raw_data)))
+raw_nobg <- preprocessCore::rma.background.correct(exprs(raw_data))
+
+plotDensity(log(raw_nobg),xlab='log intensity',main="CEL file densities after RMA background correction",lwd=2)
+
+# quantile normalisation
+
+raw_normalised <- preprocessCore::normalize.quantiles(raw_nobg)
+plotDensity(log(raw_normalised),lwd=2,xlab='log intensity',
+            main="CEL file densities after quantile normalisation")
+dim(raw_normalised)
+
+
+
+
+## summarization
+
+# we can't easily run median polish because it's run 56K times
+#the resulting value will be after log transformation,
+#intensity of the gene different from raw_data after rma
+eset <- rma(raw_data)
+exprs(eset['1007_s_at',])
+
+pData(eset)
+methods(class=class(eset))
+
+pData(eset)[['culture medium:ch1']]
+eset[['culture medium:ch1']]
+
+# differential expression
+
+library(limma)
+eset[['culture']] <- eset[['culture medium:ch1']]
+pData(eset)
+eset$culture
+~ 0 + eset$culture
+~ eset$culture   #intercept is the absolute value of expression
+#baseline as MEGM
+model <- model.matrix(~ 0 + eset$culture)
+colnames(model) <- levels(as.factor(eset$culture))
+model
+contrasts <- makeContrasts(SCGM - MEGM, levels=model)
+# test what's the difference between these two different media conditions.
+# now we have a model, and have some contrasts! 
+
+fit <- lmFit(eset,design=model) #t test 54k x 2 estimate of SD rma expression, p value and t test close to 0 it doesn't make sense, the reason that that happens is just because we have so few data points per gene.
+methods(class=class(fit))
+plotMA(fit)
+fitted.contrast <- contrasts.fit(fit,contrasts)
+fit2 <- eBayes(fitted.contrast)   #the values that have standard deviation that are actually zero in the original measurement will be raised a little bit.
+topTable(fit2,lfc=2)
+top_gene <- row.names(topTable(fit2,lfc=2))[1]
+exprs(eset)[top_gene,]
+exprs(eset)["228335_at",]
+dim(topTable(fit2,number=Inf,p.value = 0.05,lfc=2))
+# at this point, we've got some genes!
+
+volcanoplot(fit2)#a small P value would be associated with a large fold change either up or down,increase in pvalue y-axis decreas
+abline(v=c(-2,2),col='red')
+abline(h=1.3,col='red')
+
+interesting_genes <- row.names(topTable(fit2,lfc=1,p.value=0.05,number=Inf))
+heatmap(exprs(eset[interesting_genes,]),
+        distfun   = function(x) as.dist(1-cor(t(x))))
+#generate correlations between the genes and then it's going to take one minus the correlation function and treat that as a distance 
+### what about batch effects? 
+# This is all the data
+#How are they distributed so if you rotate them so that the variation between samples is, if you rotate those six(# samples) dimensions
+#otate it such that you only see the "tallest" variation out of the 6 versus the 54K positions
+pc <- princomp(exprs(eset))
+summary(pc)
+?biplot
+loadings <- as.data.frame(as.matrix(pc$loadings)[,c(1:2)])
+loadings$culture <- eset$culture  
+loadings
+plot(loadings[,c(1,2)],pch=loadings[,3],
+     main="all the data!")
+
+head(exprs(eset))
+
+# select interesting genes and do the same thing!
+plot(pc)
+#these are eigenvalues of covariance matrix and the eigenvectors are the actual principal components
+pc2 <- princomp(exprs(eset[interesting_genes,]))
+summary(pc2)
+loadings2 <- as.data.frame(as.matrix(pc2$loadings)[,c(1:2)])
+loadings2$culture <- eset$culture  
+loadings2
+plot(loadings2[,c(1,2)],pch=loadings2[,3],main="genes that are differentially expressed")
+#variation is actually only about the differences between SCGM and MGM because we've selected for genes that are designed to show that.
+#It is the rotation that maximizes all of the variance
+
